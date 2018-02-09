@@ -140,7 +140,7 @@ prihdr['CTYPE2'] = hdr['CTYPE3']
 prihdr['CDELT2'] = hdr['CDELT3']
 prihdr['CRVAL2'] = hdr['CRVAL3']
 prihdr['CRPIX2'] = hdr['CRPIX3']
-hdulist.writeto(PV_file_name, clobber=True)
+hdulist.writeto(PV_file_name, overwrite=True)
 hdulist.close()
 
 n_x = int(hdr['NAXIS1'])
