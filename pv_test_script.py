@@ -100,7 +100,7 @@ def load_fits_im(cube_name, is_PV=False):
 
 
 PV_file_name = 'pv_test_file.fits'
-cube_file = 'im_H13CN_c_cnv.fits'
+cube_file = '/Users/tsrice/ALMA_subcubes/subcube_spw27_20kms_10arcsec.fits'
 
 # Define a path in the image from pv_path_1 to pv_path_2
 rotation_axis_len = 50
