@@ -18,31 +18,11 @@ AB_position_angle = source_A.position_angle(source_B)
 
 print("Position angle: {:.2f}".format(AB_position_angle.to(u.deg)) )
 
-# cube_file = os.path.expanduser("~/ALMA_subcubes/subcube_spw27_20kms_10arcsec.fits")
-# cube = spectral_cube.SpectralCube.read(cube_file)
-
 A_ra = source_A.fk5.ra
 A_dec = source_A.fk5.dec
 
-# A_ra_px, A_dec_px, zero_vel_channel = cube.wcs.all_world2pix(source_A.fk5.ra, source_A.fk5.dec, 0, 0)
-
-# source_A_spectrum = cube[:, int(A_dec_px), int(A_ra_px)]
-
 B_ra = source_B.fk5.ra
 B_dec = source_B.fk5.dec
-
-# B_ra_px, B_dec_px, zero_vel_channel = cube.wcs.all_world2pix(source_B.fk5.ra, source_B.fk5.dec, 0, 0)
-
-# source_B_spectrum = cube[:, int(B_dec_px), int(B_ra_px)]
-
-
-# plt.figure()
-# plt.plot(source_A_spectrum.spectral_axis, source_A_spectrum, label='Continuum peak A')
-# plt.plot(source_B_spectrum.spectral_axis, source_B_spectrum, label='Continuum peak B')
-# plt.legend()
-# plt.show()
-# plt.savefig("H13CN_cont_peaks_spectra.png", bbox_inches='tight')
-
 
 files_list = ["subcube_spw25_20kms_10arcsec.fits",
     "subcube_spw27_20kms_10arcsec.fits",
