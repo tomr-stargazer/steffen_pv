@@ -12,6 +12,9 @@ import astropy.units as u
 import astropy.stats
 import aplpy
 
+from pvextractor import extract_pv_slice, Path
+from pv_test_script import save_extracted_pv_slice_hdu, load_fits_im
+
 # These coords were read by-eye out of CASAVIEWER.
 source_A = SkyCoord('03h27m39.109s', '+30d13m03.019s', frame='fk5')
 source_B = SkyCoord('03h27m39.119s', '+30d13m02.800s', frame='fk5')
@@ -40,10 +43,7 @@ labels_list = ["HC15N", "H13CN", "SiO", "H13CO+", "SO", "CH3OH", "CS"]
 
 
 # prototype land
-if False:
-
-    filename = files_list[1]
-    label = labels_list[1]
+def PV_diagram_plot(filename, label, length=4*u.arcsec):
 
     cube = spectral_cube.SpectralCube.read(filename)
 
@@ -51,30 +51,49 @@ if False:
 
     # It's centered on whatever pixel is at the B source center
     B_ra_px, B_dec_px, zero_vel_channel = cube.wcs.all_world2pix(source_B.fk5.ra, source_B.fk5.dec, 0, 0)
-
-
-    # its direction is along the binary axis
+    source_position_px = (B_ra_px, B_dec_px)
+    cen_px = source_position_px
 
     # and it is 4'' long.
+    semi_length_in_arcsec = length/2
+    semi_length_in_px = semi_length_in_arcsec.to(u.deg)/(cube.header['CDELT2']*u.Unit(cube.header['CUNIT2']))
 
-
-    # position of the H13CN peak emission, in pixel coordinates
-    source_position_px = (302, 360)
+    # its direction is along the binary axis
+    delta_x_px = semi_length_in_px * np.cos(AB_position_angle)
+    delta_y_px = semi_length_in_px * np.sin(AB_position_angle)
 
     # Define a path in the image from pv_path_1 to pv_path_2
-    rotation_axis_len = 50
-    pv_path_1 = (source_position_px[0], source_position_px[1] - rotation_axis_len/2.0)  # (x, y) pixel values
-    pv_path_2 = (source_position_px[0], source_position_px[1] + rotation_axis_len/2.0)  # (x, y) pixel values
+    pv_path_1 = (cen_px[0] + delta_x_px, cen_px[1] + delta_y_px)  # (x, y) pixel values
+    pv_path_2 = (cen_px[0] - delta_x_px, cen_px[1] - delta_y_px)  # (x, y) pixel values
 
     # The path defines the line, whereupon normal
     # dimension is collapsed. I.e. the path line defines the offset direction
     # vector in the pv diagram.
 
-    image_path = Path([pv_path_1, pv_path_2])
-    data_cube, hdr = load_fits_cube(cube_file)
+    image_path = Path([pv_path_1, pv_path_2], width=3)
 
-    hdu = extract_pv_slice(data_cube, image_path)
+    hdu = extract_pv_slice(cube.hdu.data, image_path)
+    PV_file_name = 'pv_test_file.fits'
+    save_extracted_pv_slice_hdu(hdu, cube.hdu.header, PV_file_name)
+    image_data, im_hdr = load_fits_im(PV_file_name)
 
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
+
+    im = ax.imshow(image_data, aspect='auto', interpolation='nearest',
+                   cmap=plt.cm.YlOrBr, origin='lower')
+    ax.set_xlabel('x [pixels]', fontsize=12)
+    ax.set_ylabel(r'y [channels]', fontsize=12)
+    ax.set_title("{0} PV diagram".format(label))
+
+    # Colorbar
+    colorbar_ax = fig.add_axes([0.9, 0.11, 0.05, 0.77])
+    fig.colorbar(im, cax=colorbar_ax, label=r'Jy Beam$^{-1}$')
+    colorbar_ax.tick_params(labelsize=10)
+
+    return fig
+
+    # plt.show()
 
 
 def contpeak_spectra(filename, label):
@@ -151,10 +170,12 @@ for file, label in zip(files_list, labels_list):
 
     filepath = os.path.expanduser("~/ALMA_subcubes/")+file
 
-    if True:
+    if False:
         contpeak_spectra(filepath, label)
 
-    redblue_moments(filepath, label)
+        redblue_moments(filepath, label)
+    PV_diagram_plot(filepath, label)
+
 
 
 plt.show()
