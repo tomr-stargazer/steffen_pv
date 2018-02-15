@@ -99,68 +99,76 @@ def load_fits_im(cube_name, is_PV=False):
     return data_cube, hdr
 
 
-PV_file_name = 'pv_test_file.fits'
-cube_file = '/Users/tsrice/ALMA_subcubes/subcube_spw27_20kms_10arcsec.fits'
+def save_extracted_pv_slice_hdu(hdu, hdr, PV_file_name):
+    # Then create a HDUList to contain the newly created primary
+    # HDU, and write to a new file:
+    hdulist = pyfits.HDUList([hdu])
 
-# Define a path in the image from pv_path_1 to pv_path_2
-rotation_axis_len = 50
-pv_path_1 = (500, 500 - rotation_axis_len/2.0)  # (x, y) pixel values
-pv_path_2 = (500, 500 + rotation_axis_len/2.0)  # (x, y) pixel values
+    # Copy original header files onto the new fits file - this is very
+    # important in order for miriad functions to work properly, i.e. CDELT3
+    # (channel width) is needed in order to calculate the zeroth moment map
+    # properly as a channel width of 1 km/s is otherwise assumed.
+    exclude_keywords_list = ['CTYPE3', 'CRVAL3', 'CDELT3', 'CRPIX3',
+                             'CUNIT3', 'CTYPE4', 'CRVAL4', 'CDELT4',
+                             'CRPIX4', 'CUNIT4']
+    prihdr = hdulist[0].header
+    for x in hdr:
+        if x not in exclude_keywords_list:
+            try:
+                prihdr[x] = hdr[x]
+            except ValueError:
+                pass
 
-# The path defines the line, whereupon normal
-# dimension is collapsed. I.e. the path line defines the offset direction
-# vector in the pv diagram.
+    prihdr['NAXIS2'] = hdr['NAXIS3']
+    prihdr['CTYPE2'] = hdr['CTYPE3']
+    prihdr['CDELT2'] = hdr['CDELT3']
+    prihdr['CRVAL2'] = hdr['CRVAL3']
+    prihdr['CRPIX2'] = hdr['CRPIX3']
+    hdulist.writeto(PV_file_name, overwrite=True)
+    hdulist.close()
 
-image_path = Path([pv_path_1, pv_path_2])
-data_cube, hdr = load_fits_cube(cube_file)
 
-hdu = extract_pv_slice(data_cube, image_path)
+if __name__ == '__main__':
 
-# Then create a HDUList to contain the newly created primary
-# HDU, and write to a new file:
-hdulist = pyfits.HDUList([hdu])
+    PV_file_name = 'pv_test_file.fits'
+    cube_file = '/Users/tsrice/ALMA_subcubes/subcube_spw27_20kms_10arcsec.fits'
 
-# Copy original header files onto the new fits file - this is very
-# important in order for miriad functions to work properly, i.e. CDELT3
-# (channel width) is needed in order to calculate the zeroth moment map
-# properly as a channel width of 1 km/s is otherwise assumed.
-exclude_keywords_list = ['CTYPE3', 'CRVAL3', 'CDELT3', 'CRPIX3',
-                         'CUNIT3', 'CTYPE4', 'CRVAL4', 'CDELT4',
-                         'CRPIX4', 'CUNIT4']
-prihdr = hdulist[0].header
-for x in hdr:
-    if x not in exclude_keywords_list:
-        try:
-            prihdr[x] = hdr[x]
-        except ValueError:
-            pass
+    # position of the H13CN peak emission, in pixel coordinates
+    source_position_px = (302, 360)
 
-prihdr['NAXIS2'] = hdr['NAXIS3']
-prihdr['CTYPE2'] = hdr['CTYPE3']
-prihdr['CDELT2'] = hdr['CDELT3']
-prihdr['CRVAL2'] = hdr['CRVAL3']
-prihdr['CRPIX2'] = hdr['CRPIX3']
-hdulist.writeto(PV_file_name, overwrite=True)
-hdulist.close()
+    # Define a path in the image from pv_path_1 to pv_path_2
+    rotation_axis_len = 50
+    pv_path_1 = (source_position_px[0], source_position_px[1] - rotation_axis_len/2.0)  # (x, y) pixel values
+    pv_path_2 = (source_position_px[0], source_position_px[1] + rotation_axis_len/2.0)  # (x, y) pixel values
 
-n_x = int(hdr['NAXIS1'])
-n_chan = int(hdr['NAXIS2'])
+    # The path defines the line, whereupon normal
+    # dimension is collapsed. I.e. the path line defines the offset direction
+    # vector in the pv diagram.
 
-font_size = 12
+    image_path = Path([pv_path_1, pv_path_2])
+    data_cube, hdr = load_fits_cube(cube_file)
 
-fig = plt.figure()
-ax = fig.add_subplot(1, 1, 1)
+    hdu = extract_pv_slice(data_cube, image_path)
+    save_extracted_pv_slice_hdu(hdu, hdr, PV_file_name)
 
-image_data, im_hdr = load_fits_im(PV_file_name)
-im = ax.imshow(image_data, aspect='auto', interpolation='nearest',
-               cmap=plt.cm.YlOrBr, origin='lower')
+    n_x = int(hdr['NAXIS1'])
+    n_chan = int(hdr['NAXIS2'])
 
-ax.set_xlabel('x [pixels]', fontsize=font_size)
-ax.set_ylabel(r'y [channels]', fontsize=font_size)
+    font_size = 12
 
-# Colorbar
-colorbar_ax = fig.add_axes([0.9, 0.11, 0.05, 0.77])
-fig.colorbar(im, cax=colorbar_ax, label=r'Jy Beam$^{-1}$')
-colorbar_ax.tick_params(labelsize=10)
+    fig = plt.figure()
+    ax = fig.add_subplot(1, 1, 1)
 
-plt.show()
+    image_data, im_hdr = load_fits_im(PV_file_name)
+    im = ax.imshow(image_data, aspect='auto', interpolation='nearest',
+                   cmap=plt.cm.YlOrBr, origin='lower')
+
+    ax.set_xlabel('x [pixels]', fontsize=font_size)
+    ax.set_ylabel(r'y [channels]', fontsize=font_size)
+
+    # Colorbar
+    colorbar_ax = fig.add_axes([0.9, 0.11, 0.05, 0.77])
+    fig.colorbar(im, cax=colorbar_ax, label=r'Jy Beam$^{-1}$')
+    colorbar_ax.tick_params(labelsize=10)
+
+    plt.show()
