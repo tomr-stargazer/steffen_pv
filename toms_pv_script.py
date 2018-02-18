@@ -4,12 +4,15 @@ Tom's shot at simplifying the PV approach.
 """
 
 import os
+import pdb
+
 import numpy as np
 import matplotlib.pyplot as plt
 import spectral_cube
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import astropy.stats
+from astropy.io.fits import getheader
 import aplpy
 
 from pvextractor import extract_pv_slice, Path
@@ -39,38 +42,41 @@ files_list = ["subcube_spw25_20kms_10arcsec.fits",
 
 labels_list = ["HC15N", "H13CN", "SiO", "H13CO+", "SO", "CH3OH", "CS"]
 
-
-
-
-# prototype land
-def PV_diagram_plot(filename, label, length=4*u.arcsec):
-
-    cube = spectral_cube.SpectralCube.read(filename)
-
-    # let's make the "parallel" PV diagram.
+def pv_path(header, length=4*u.arcsec, rotation=0):
 
     # It's centered on whatever pixel is at the B source center
-    B_ra_px, B_dec_px, zero_vel_channel = cube.wcs.all_world2pix(source_B.fk5.ra, source_B.fk5.dec, 0, 0)
+    wcs = astropy.wcs.WCS(header)
+    B_ra_px, B_dec_px, zero_vel_channel = wcs.all_world2pix(source_B.fk5.ra, source_B.fk5.dec, 0, 1)
     source_position_px = (B_ra_px, B_dec_px)
     cen_px = source_position_px
 
     # and it is 4'' long.
     semi_length_in_arcsec = length/2
-    semi_length_in_px = semi_length_in_arcsec.to(u.deg)/(cube.header['CDELT2']*u.Unit(cube.header['CUNIT2']))
+    semi_length_in_px = semi_length_in_arcsec.to(u.deg)/(header['CDELT2']*u.Unit(header['CUNIT2']))
 
     # its direction is along the binary axis
-    delta_x_px = semi_length_in_px * np.cos(AB_position_angle)
-    delta_y_px = semi_length_in_px * np.sin(AB_position_angle)
+    delta_x_px = semi_length_in_px * np.cos(AB_position_angle + rotation*u.deg)
+    delta_y_px = semi_length_in_px * np.sin(AB_position_angle + rotation*u.deg)
 
     # Define a path in the image from pv_path_1 to pv_path_2
     pv_path_1 = (cen_px[0] + delta_x_px, cen_px[1] + delta_y_px)  # (x, y) pixel values
-    pv_path_2 = (cen_px[0] - delta_x_px, cen_px[1] - delta_y_px)  # (x, y) pixel values
+    pv_path_2 = (cen_px[0] - delta_x_px, cen_px[1] - delta_y_px)  # (x, y) pixel values    
+
+    return pv_path_1, pv_path_2
+
+
+# prototype land
+def PV_diagram_plot(filename, label, length=4*u.arcsec, rotation=0):
+
+    cube = spectral_cube.SpectralCube.read(filename)
+
+    # let's make the "parallel" PV diagram.
 
     # The path defines the line, whereupon normal
     # dimension is collapsed. I.e. the path line defines the offset direction
     # vector in the pv diagram.
 
-    image_path = Path([pv_path_1, pv_path_2], width=3)
+    image_path = Path([*pv_path(cube.header, length, rotation)], width=3)
 
     hdu = extract_pv_slice(cube.hdu.data, image_path)
     PV_file_name = 'pv_test_file.fits'
@@ -84,7 +90,7 @@ def PV_diagram_plot(filename, label, length=4*u.arcsec):
                    cmap=plt.cm.YlOrBr, origin='lower')
     ax.set_xlabel('x [pixels]', fontsize=12)
     ax.set_ylabel(r'y [channels]', fontsize=12)
-    ax.set_title("{0} PV diagram".format(label))
+    ax.set_title("{0} PV diagram. Rotation={1}".format(label, rotation))
 
     # Colorbar
     colorbar_ax = fig.add_axes([0.9, 0.11, 0.05, 0.77])
@@ -118,7 +124,6 @@ def contpeak_spectra(filename, label):
     plt.plot(source_B_spectrum.spectral_axis, source_B_spectrum, label='Continuum peak B')
     plt.title(label)
     plt.legend()
-    plt.savefig("continuum_peak_spectra/{0}_cont_peaks_spectra.png".format(label), bbox_inches='tight')
 
     return fig
 
@@ -161,22 +166,60 @@ def redblue_moments(filename, label):
     # center_in_world_coords = fig.pixel2world(*(x/2 for x in cube_mom0.shape))
     fig.recenter(source_A.ra, source_A.dec, radius=2.5/3600)
 
-    plt.savefig("redblue_moments/{0}_redblue_moments.png".format(label), bbox_inches='tight')
-
     return fig
+
+def add_PV_line_to_moment_map(fig, pv_path_tuple):
+
+    xs_ys = np.array([pv_path_tuple[0], pv_path_tuple[1]])
+
+    plt.plot(*xs_ys.T, color='w', lw=0.5, linestyle='--')
 
 
 for file, label in zip(files_list, labels_list):
+    break
+
+    if label == 'H13CO+' or label == 'CS':
+        length = 3*u.arcsec
+    else:
+        length = 1.5 * u.arcsec
+    print(label, length)
 
     filepath = os.path.expanduser("~/ALMA_subcubes/")+file
+    header = getheader(filepath)
 
-    if False:
-        contpeak_spectra(filepath, label)
+    if True:
+        contpeak_fig = contpeak_spectra(filepath, label)
+        contpeak_fig.savefig("continuum_peak_spectra/{0}_cont_peaks_spectra.png".format(label), bbox_inches='tight')
 
-        redblue_moments(filepath, label)
-    PV_diagram_plot(filepath, label)
+        redblue_fig = redblue_moments(filepath, label)
+        add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length))
+        add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, rotation=90))
+        redblue_fig.savefig("redblue_moments/{0}_redblue_moments.png".format(label), adjust_bbox='True')
+
+    pv_plot_para = PV_diagram_plot(filepath, label, length=length, rotation=0)
+    pv_plot_para.savefig("pv_plots/{0}_pv_plot_parallel.png".format(label), bbox_inches='tight')
+
+    pv_plot_ortho = PV_diagram_plot(filepath, label, length=length, rotation=90)
+    pv_plot_ortho.savefig("pv_plots/{0}_pv_plot_orthogonal.png".format(label), bbox_inches='tight')
 
 
+if True: 
+    h13cn_file = "subcube_spw27_20kms_10arcsec.fits"
+    label = "H13CN"
+    filepath = os.path.expanduser("~/ALMA_subcubes/")+h13cn_file
+    header = getheader(filepath)
+    length = 1.5 * u.arcsec
+
+    redblue_fig = redblue_moments(filepath, label)
+    add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, rotation=-50))
+    add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, rotation=-50+90))
+    redblue_fig.savefig("h13cn_gradient_experiment/{0}_redblue_moments.png".format(label), adjust_bbox='True')
+
+    pv_plot_para = PV_diagram_plot(filepath, label, length=length, rotation=-50)
+    pv_plot_para.savefig("h13cn_gradient_experiment/{0}_pv_plot_parallel.png".format(label), bbox_inches='tight')
+
+    pv_plot_ortho = PV_diagram_plot(filepath, label, length=length, rotation=-50+90)
+    pv_plot_ortho.savefig("h13cn_gradient_experiment/{0}_pv_plot_orthogonal.png".format(label), bbox_inches='tight')    
 
 plt.show()
 
