@@ -176,32 +176,35 @@ def add_PV_line_to_moment_map(fig, pv_path_tuple):
 
 
 for file, label in zip(files_list, labels_list):
-    # break
-
-    if label == 'H13CO+' or label == 'CS':
-        length = 3*u.arcsec
-    else:
-        length = 1.5 * u.arcsec
-    print(label, length)
 
     filepath = os.path.expanduser("~/ALMA_subcubes/")+file
     header = getheader(filepath)
 
-    if True:
-        contpeak_fig = contpeak_spectra(filepath, label)
-        contpeak_fig.savefig("continuum_peak_spectra/{0}_cont_peaks_spectra.png".format(label), bbox_inches='tight')
+    contpeak_fig = contpeak_spectra(filepath, label)
+    contpeak_fig.savefig("continuum_peak_spectra/{0}_cont_peaks_spectra.png".format(label), bbox_inches='tight')
+
+    rotation_offset = {"binary_axis": AB_position_angle, "gradient_axis": 10*u.deg}
+    for axis in ["binary_axis", "gradient_axis"]:
+        if axis == 'binary_axis':
+            continue
+
+        rotation = rotation_offset[axis]
+        if label == 'H13CO+' or label == 'CS':
+            length = 3*u.arcsec
+        else:
+            length = 1.5 * u.arcsec
+        print(label, length)
 
         redblue_fig = redblue_moments(filepath, label)
-        add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=AB_position_angle.deg))
-        add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=AB_position_angle.deg+90))
-        redblue_fig.savefig("redblue_moments/{0}_redblue_moments.png".format(label), adjust_bbox='True')
+        add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=rotation.to(u.deg).value))
+        add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=rotation.to(u.deg).value+90))
+        redblue_fig.savefig(axis+"/redblue_moments/{0}_redblue_moments.png".format(label), adjust_bbox='True')
 
-    break
-    pv_plot_para = PV_diagram_plot(filepath, label, length=length, position_angle=0)
-    pv_plot_para.savefig("pv_plots/{0}_pv_plot_parallel.png".format(label), bbox_inches='tight')
+        pv_plot_para = PV_diagram_plot(filepath, label, length=length, position_angle=rotation.to(u.deg).value+0)
+        pv_plot_para.savefig(axis+"/pv_plots/{0}_pv_plot_parallel.png".format(label), bbox_inches='tight')
 
-    pv_plot_ortho = PV_diagram_plot(filepath, label, length=length, position_angle=90)
-    pv_plot_ortho.savefig("pv_plots/{0}_pv_plot_orthogonal.png".format(label), bbox_inches='tight')
+        pv_plot_ortho = PV_diagram_plot(filepath, label, length=length, position_angle=rotation.to(u.deg).value+90)
+        pv_plot_ortho.savefig(axis+"/pv_plots/{0}_pv_plot_orthogonal.png".format(label), bbox_inches='tight')
 
 
 if False: 
@@ -212,14 +215,14 @@ if False:
     length = 1.5 * u.arcsec
 
     redblue_fig = redblue_moments(filepath, label)
-    add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=-50))
-    add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=-50+90))
+    add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=10))
+    add_PV_line_to_moment_map(redblue_fig, pv_path(header, length=length, position_angle=-80))
     redblue_fig.savefig("h13cn_gradient_experiment/{0}_redblue_moments.png".format(label), adjust_bbox='True')
 
-    pv_plot_para = PV_diagram_plot(filepath, label, length=length, position_angle=-50)
+    pv_plot_para = PV_diagram_plot(filepath, label, length=length, position_angle=10)
     pv_plot_para.savefig("h13cn_gradient_experiment/{0}_pv_plot_parallel.png".format(label), bbox_inches='tight')
 
-    pv_plot_ortho = PV_diagram_plot(filepath, label, length=length, position_angle=-50+90)
+    pv_plot_ortho = PV_diagram_plot(filepath, label, length=length, position_angle=-80)
     pv_plot_ortho.savefig("h13cn_gradient_experiment/{0}_pv_plot_orthogonal.png".format(label), bbox_inches='tight')    
 
 plt.show()
